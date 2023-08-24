@@ -4,10 +4,12 @@ import java.util.List;
 
 public class MergeSort
 {
+    private static final int BLOCK_SIZE = 5;
     private String sortMode;
     private String dataType;
     private String outputFile;
     private List<String> inputFiles;
+    private BufferedWriter writer;
 
     public void run (String sortMode, String dataType, String outputFile, List<String> inputFiles)
     {
@@ -16,15 +18,37 @@ public class MergeSort
         this.outputFile = outputFile;
         this.inputFiles = inputFiles;
 
-        switch (dataType)
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile)))
         {
-            case "-i" -> {
-                sortInt();
-            }
+            this.writer = writer;
+            switch (dataType)
+            {
+                case "-i" -> {
+                    sortInt();
+                }
 
-            case "-s" -> {
-                sortStr();
+                case "-s" -> {
+                    sortStr();
+                }
             }
+        }
+        catch (IOException e)
+        {
+            System.out.println("An error occurred during creating output writer!");
+        }
+    }
+
+    private <T> void writeOutput(List<T> data)
+    {
+        try
+        {
+            for (T d : data)
+            {
+                this.writer.write(d.toString());
+                this.writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("An error occurred during writing in: " + outputFile);
         }
     }
 
@@ -40,6 +64,12 @@ public class MergeSort
                 while ((num = reader.readLine()) != null)
                 {
                     nums.add(Integer.parseInt(num));
+                    if(nums.size() >= BLOCK_SIZE)
+                    {
+                        mergeSort(nums, 0, nums.size()-1);
+                        writeOutput(nums);
+                        nums.clear();
+                    }
                 }
             }
             catch (NumberFormatException nfe)
@@ -52,22 +82,15 @@ public class MergeSort
             }
         }
 
-        mergeSort(nums, 0, nums.size() - 1);
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile)))
+        if (nums.size() > 0)
         {
-            for (Integer number : nums)
-            {
-                writer.write(number.toString());
-                writer.newLine();
-            }
-        } catch (IOException e)
-        {
-            e.printStackTrace();
+            mergeSort(nums, 0, nums.size()-1);
+            writeOutput(nums);
         }
     }
 
-    private boolean isNumeric(String str) {
+    private boolean isNumeric(String str)
+    {
         try
         {
             Integer.parseInt(str);
@@ -94,8 +117,14 @@ public class MergeSort
                     {
                         System.out.println("Input contains incorrect data: " + str + " In file: " + input);
                     }
-
                     strs.add(str);
+
+                    if (strs.size() >= BLOCK_SIZE)
+                    {
+                        mergeSort(strs, 0, strs.size() - 1);
+                        writeOutput(strs);
+                        strs.clear();
+                    }
                 }
             }
             catch (IOException e)
@@ -104,19 +133,10 @@ public class MergeSort
             }
         }
 
-        mergeSort(strs, 0, strs.size() - 1);
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile)))
+        if (strs.size() > 0)
         {
-            for (String string : strs)
-            {
-                writer.write(string);
-                writer.newLine();
-            }
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
+            mergeSort(strs, 0, strs.size() - 1);
+            writeOutput(strs);
         }
     }
 
