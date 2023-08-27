@@ -4,12 +4,15 @@ import java.util.List;
 
 public class MergeSort
 {
-    private static final int BLOCK_SIZE = 5;
+    private static final int BLOCK_SIZE = 4;
     private String sortMode;
     private String dataType;
     private String outputFile;
-    private List<String> inputFiles;
-    private BufferedWriter writer;
+    private List<String> inputFiles; // files, containing data for the program
+    private List<File> helpingFiles = new ArrayList<>(); // files, tht will contain промежуточные вычисления
+    private BufferedWriter writer; // this writer writes in output file
+    private BufferedWriter helpFileWriter; // this writer writes in helping file
+    private int newfileNum = 1; // helping files names will be: 1 2 3 ...
 
     public void run (String sortMode, String dataType, String outputFile, List<String> inputFiles)
     {
@@ -23,13 +26,8 @@ public class MergeSort
             this.writer = writer;
             switch (dataType)
             {
-                case "-i" -> {
-                    sortInt();
-                }
-
-                case "-s" -> {
-                    sortStr();
-                }
+                case "-i" -> sortInt();
+                case "-s" -> sortStr();
             }
         }
         catch (IOException e)
@@ -38,173 +36,257 @@ public class MergeSort
         }
     }
 
-    private <T> void writeOutput(List<T> data)
+    private void writeOutput()
     {
-        try
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFiles.get(0))))
         {
-            for (T d : data)
+            String str = " ";
+            while ((str = reader.readLine()) != null)
             {
-                this.writer.write(d.toString());
+                this.writer.write(str);
                 this.writer.newLine();
             }
-        } catch (IOException e) {
-            System.out.println("An error occurred during writing in: " + outputFile);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
         }
     }
 
     private void sortInt()
     {
-        List<Integer> nums = new ArrayList<>();
-        String num = " ";
-
-        for (String input : inputFiles)
+        while (inputFiles.size() > 1)
         {
-            try (BufferedReader reader = new BufferedReader(new FileReader(input)))
+            for(int i = 0; i < inputFiles.size()-1; i++)
             {
-                while ((num = reader.readLine()) != null)
+                if (inputFiles.get(i+1) == null)
+                    break;
+
+                try(BufferedReader reader1 = new BufferedReader(new FileReader(inputFiles.get(i)));
+                    BufferedReader reader2 = new BufferedReader(new FileReader(inputFiles.get(i+1))))
                 {
-                    nums.add(Integer.parseInt(num));
-                    if(nums.size() >= BLOCK_SIZE)
+                    List<Integer> nums1 = new ArrayList<>();
+                    List<Integer> nums2 = new ArrayList<>();
+                    String num1 = reader1.readLine();
+                    String num2 = reader2.readLine();
+                    File newFile = new File(String.valueOf(newfileNum));
+                    newFile.createNewFile();
+                    // saving helping file to have an opportunity in future to delete it
+                    helpingFiles.add(newFile);
+                    helpFileWriter = new BufferedWriter(new FileWriter(String.valueOf(newfileNum)));
+
+                    while (num1 != null || num2 != null)
                     {
-                        mergeSort(nums, 0, nums.size()-1);
-                        writeOutput(nums);
-                        nums.clear();
+                        if(num1 != null)
+                            nums1.add(Integer.parseInt(num1));
+                        if (num2 != null)
+                            nums2.add(Integer.parseInt(num2));
+
+                        if (nums1.size() >= BLOCK_SIZE || nums2.size() >= BLOCK_SIZE)
+                        {
+                            var res = merge(nums1, nums2);
+                            writeHelpFile(res);
+                        }
+
+                        num1 = reader1.readLine();
+                        num2 = reader2.readLine();
                     }
+
+                    // check remaining
+                    // if two buffers contain data then sort&merge
+                    if (nums1.size() > 0 && nums2.size() > 0)
+                    {
+                        var res = merge(nums1, nums2);
+                        writeHelpFile(res);
+                    }
+
+                    // if only one buffer contain data then just write it into help file
+                    if (nums1.size() > 0)
+                        writeHelpFile(nums1);
+                    if (nums2.size() > 0)
+                        writeHelpFile(nums2);
+
+                    helpFileWriter.close();
                 }
-            }
-            catch (NumberFormatException nfe)
-            {
-                System.out.println("Input contains incorrect data: " + num + " In file: " + input);
-            }
-            catch (IOException e)
-            {
-                System.out.println("An error occurred during reading input files!");
+                catch (NumberFormatException nfe)
+                {
+                    System.out.println("Input contains incorrect data in files: "+
+                            inputFiles.get(i)+"|"+inputFiles.get(i+1));
+                }
+                catch (IOException e)
+                {
+                    throw new RuntimeException(e);
+                }
+
+                inputFiles.remove(i+1);
+                inputFiles.set(i, String.valueOf(newfileNum));
+                newfileNum++;
             }
         }
 
-        if (nums.size() > 0)
-        {
-            mergeSort(nums, 0, nums.size()-1);
-            writeOutput(nums);
-        }
-    }
-
-    private boolean isNumeric(String str)
-    {
-        try
-        {
-            Integer.parseInt(str);
-            return true;
-        }
-        catch (NumberFormatException e)
-        {
-            return false;
-        }
+        writeOutput();
+        deleteHelpingFiles();
     }
 
     private void sortStr()
     {
-        List<String> strs = new ArrayList<>();
-        String str;
-
-        for (String input : inputFiles)
+        while (inputFiles.size() > 1)
         {
-            try (BufferedReader reader = new BufferedReader(new FileReader(input)))
+            for(int i = 0; i < inputFiles.size()-1; i++)
             {
-                while ((str = reader.readLine()) != null)
+                if (inputFiles.get(i+1) == null)
+                    break;
+
+                try(BufferedReader reader1 = new BufferedReader(new FileReader(inputFiles.get(i)));
+                    BufferedReader reader2 = new BufferedReader(new FileReader(inputFiles.get(i+1))))
                 {
-                    if (isNumeric(str))
-                    {
-                        System.out.println("Input contains incorrect data: " + str + " In file: " + input);
-                    }
-                    strs.add(str);
+                    List<String> strs1 = new ArrayList<>();
+                    List<String> strs2 = new ArrayList<>();
+                    String str1 = reader1.readLine();
+                    String str2 = reader2.readLine();
+                    File newFile = new File(String.valueOf(newfileNum));
+                    newFile.createNewFile();
+                    helpingFiles.add(newFile);
+                    helpFileWriter = new BufferedWriter(new FileWriter(String.valueOf(newfileNum)));
 
-                    if (strs.size() >= BLOCK_SIZE)
+                    while (str1 != null || str2 != null)
                     {
-                        mergeSort(strs, 0, strs.size() - 1);
-                        writeOutput(strs);
-                        strs.clear();
+                        // checking if there are spaces in strings
+                        if(str1 != null)
+                        {
+                            str1 = str1.replaceAll(" ", "");
+                            strs1.add(str1);
+                        }
+
+                        if (str2 != null)
+                        {
+                            str2 = str2.replaceAll(" ", "");
+                            strs2.add(str2);
+                        }
+
+                        // if block filled, then start sorting
+                        if (strs1.size() >= BLOCK_SIZE || strs2.size() >= BLOCK_SIZE)
+                        {
+                            var res = merge(strs1, strs2);
+                            writeHelpFile(res);
+                        }
+
+                        str1 = reader1.readLine();
+                        str2 = reader2.readLine();
                     }
+
+                    if (strs1.size() > 0 && strs2.size() > 0)
+                    {
+                        var res = merge(strs1, strs2);
+                        writeHelpFile(res);
+                    }
+
+                    if (strs1.size() > 0)
+                        writeHelpFile(strs1);
+                    if (strs2.size() > 0)
+                        writeHelpFile(strs2);
+
+                    helpFileWriter.close();
                 }
+                catch (IOException e)
+                {
+                    throw new RuntimeException(e);
+                }
+
+                inputFiles.remove(i+1);
+                inputFiles.set(i, String.valueOf(newfileNum));
+                newfileNum++;
             }
-            catch (IOException e)
+        }
+
+        writeOutput();
+        deleteHelpingFiles();
+    }
+
+    private void deleteHelpingFiles()
+    {
+        for (File file : helpingFiles)
+        {
+            file.delete();
+        }
+    }
+
+    private <T> void writeHelpFile(List<T> res)
+    {
+        try
+        {
+            System.out.println("Writing to helping file");
+            for (T d : res)
             {
-                System.out.println("An error occurred during reading input files!");
+                this.helpFileWriter.write(d.toString());
+                this.helpFileWriter.newLine();
             }
         }
-
-        if (strs.size() > 0)
+        catch (IOException e)
         {
-            mergeSort(strs, 0, strs.size() - 1);
-            writeOutput(strs);
+            System.out.println("An error occurred during writing in helping file #: " + newfileNum);
         }
     }
 
-    private <T extends Comparable<T>> void mergeSort(List<T> arr, int left, int right)
+    private <T extends Comparable<T>> List<T> merge(List<T> arr, List<T> arr2)
     {
-        if (left < right)
-        {
-            int mid = (left + right) / 2;
-            mergeSort(arr, left, mid);
-            mergeSort(arr, mid+1, right);
-            merge(arr, left, mid, right);
-        }
-    }
+        List<T> result = new ArrayList<>();
+        int i = 0, j = 0;
+        int size1 = arr.size();
+        int size2 = arr2.size();
 
-    private <T extends Comparable<T>> void merge(List<T> arr, int left, int mid, int right)
-    {
-        List<T> temp = new ArrayList<>();
-        int i = left;
-        int j = mid + 1;
-
-        while (i <= mid && j <= right)
+        while (i < arr.size() && j < arr2.size())
         {
             if (sortMode.equalsIgnoreCase("-a"))
             {
-                // Integer and String implement Comparable
-                // integers are compared as usual
-                // strings are compared lexicographically
-                if (arr.get(i).compareTo(arr.get(j)) <= 0)
+                if (arr.get(i).compareTo(arr2.get(j)) < 0)
                 {
-                    temp.add(arr.get(i));
+                    result.add(arr.get(i));
                     i++;
-                }
-                else
+                } else
                 {
-                    temp.add(arr.get(j));
+                    result.add(arr2.get(j));
                     j++;
                 }
             }
             else
             {
-                if (arr.get(i).compareTo(arr.get(j)) >= 0)
+                if (arr.get(i).compareTo(arr2.get(j)) > 0)
                 {
-                    temp.add(arr.get(i));
+                    result.add(arr.get(i));
                     i++;
-                }
-                else
+                } else
                 {
-                    temp.add(arr.get(j));
+                    result.add(arr2.get(j));
                     j++;
                 }
             }
         }
 
-        while (i <= mid)
+        if(i < arr.size() || j < arr2.size())
         {
-            temp.add(arr.get(i));
-            i++;
+            var remainingList = i < arr.size() ? arr : arr2;
+            int remainingIndex = i < arr.size() ? i : j;
+
+            // adding remaining elements to the beginning of the list
+            for (int k = remainingIndex; k < remainingList.size(); k++)
+                remainingList.set(k - remainingIndex, remainingList.get(k));
+
+            //int newSize = remainingList.size() - remainingIndex;
+            for (int k = 0; k < remainingIndex; k++)
+                remainingList.remove(remainingList.size()-1);
+
+            if (i < size1)
+                arr2.clear();
+            else
+                arr.clear();
+
+            return result;
         }
 
-        while (j <= right)
-        {
-            temp.add(arr.get(j));
-            j++;
-        }
+        arr.clear();
+        arr2.clear();
 
-        for (int k = 0; k < temp.size(); k++)
-        {
-            arr.set(left + k, temp.get(k));
-        }
+        return result;
     }
 }

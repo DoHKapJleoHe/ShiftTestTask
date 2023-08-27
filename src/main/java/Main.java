@@ -1,3 +1,7 @@
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,7 +56,7 @@ public class Main
             index++;
         }
 
-        System.out.println(inputFiles);
+        System.out.println("Input files: "+inputFiles);
 
         MergeSort sort = new MergeSort();
         sort.run(sortMode, dataType, outputFile, inputFiles);
