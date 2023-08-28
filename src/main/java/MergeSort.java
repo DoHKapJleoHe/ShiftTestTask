@@ -4,7 +4,7 @@ import java.util.List;
 
 public class MergeSort
 {
-    private static final int BLOCK_SIZE = 1000;
+    private static final int BLOCK_SIZE = 4;
     private String sortMode;
     private String dataType;
     private String outputFile;
